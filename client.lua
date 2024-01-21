@@ -48,7 +48,8 @@ RegisterNetEvent('qb-houses:client:setHouseConfig', function(houseConfig)
     Houses = houseConfig
 end)
 
-RegisterNetEvent('qb-spawn:client:setupSpawns', function(cData, new, apps)
+--removed by pamela for ps-housing
+--[[RegisterNetEvent('qb-spawn:client:setupSpawns', function(cData, new, apps)
     if not new then
         QBCore.Functions.TriggerCallback('qb-spawn:server:getOwnedHouses', function(houses)
             local myHouses = {}
@@ -76,7 +77,41 @@ RegisterNetEvent('qb-spawn:client:setupSpawns', function(cData, new, apps)
             isNew = new
         })
     end
+end)]]
+
+--added by pamela for ps-housing
+RegisterNetEvent('qb-spawn:client:setupSpawns', function(cData, new, apps)
+    if not new then
+        QBCore.Functions.TriggerCallback('qb-spawn:server:getOwnedHouses', function(houses)
+            local myHouses = {}
+            if houses ~= nil then
+                for i = 1, (#houses), 1 do
+                    local house = houses[i]
+
+                    myHouses[#myHouses+1] = {
+                        house = house,
+                        label = (house.apartment or house.street) .. " " .. house.property_id,
+                    }
+                end
+            end
+
+            Wait(500)
+            SendNUIMessage({
+                action = "setupLocations",
+                locations = QB.Spawns,
+                houses = myHouses,
+                isNew = new
+            })
+        end, cData.citizenid)
+    elseif new then
+        SendNUIMessage({
+            action = "setupAppartements",
+            locations = apps,
+            isNew = new
+        })
+    end
 end)
+--till here
 
 -- NUI Callbacks
 
@@ -127,7 +162,8 @@ RegisterNUICallback('setCam', function(data, cb)
     cb('ok')
 end)
 
-RegisterNUICallback('chooseAppa', function(data, cb)
+--removed by pamela for ps-housing
+--[[RegisterNUICallback('chooseAppa', function(data, cb)
     local ped = PlayerPedId()
     local appaYeet = data.appType
     SetDisplay(false)
@@ -144,7 +180,30 @@ RegisterNUICallback('chooseAppa', function(data, cb)
     DestroyCam(cam2, true)
     SetEntityVisible(ped, true)
     cb('ok')
+end)]]
+
+--added by pamela for ps-housing
+RegisterNUICallback('chooseAppa', function(data, cb)
+    local ped = PlayerPedId()
+    local appaYeet = data.appType
+    SetDisplay(false)
+    DoScreenFadeOut(500)
+    Wait(100)
+    FreezeEntityPosition(ped, false)
+    RenderScriptCams(false, true, 0, true, true)
+    SetCamActive(cam, false)
+    DestroyCam(cam, true)
+    SetCamActive(cam2, false)
+    DestroyCam(cam2, true)
+    SetEntityVisible(ped, true)
+    Wait(500)
+    TriggerServerEvent('QBCore:Server:OnPlayerLoaded')
+    TriggerEvent('QBCore:Client:OnPlayerLoaded')
+    Wait(100)
+    TriggerServerEvent("ps-housing:server:createNewApartment", appaYeet)
+    cb('ok')
 end)
+--till here
 
 local function PreSpawnPlayer()
     SetDisplay(false)
@@ -164,7 +223,8 @@ local function PostSpawnPlayer(ped)
     DoScreenFadeIn(250)
 end
 
-RegisterNUICallback('spawnplayer', function(data, cb)
+--removed by pamela for ps-housing
+--[[RegisterNUICallback('spawnplayer', function(data, cb)
     local location = tostring(data.spawnloc)
     local type = tostring(data.typeLoc)
     local ped = PlayerPedId()
@@ -212,7 +272,51 @@ RegisterNUICallback('spawnplayer', function(data, cb)
         PostSpawnPlayer()
     end
     cb('ok')
+end)]]
+
+--added by pamela for ps-housing
+RegisterNUICallback('spawnplayer', function(data, cb)
+    local location = tostring(data.spawnloc)
+    local type = tostring(data.typeLoc)
+    local ped = PlayerPedId()
+    local PlayerData = QBCore.Functions.GetPlayerData()
+    local insideMeta = PlayerData.metadata["inside"]
+    if type == "current" then
+        PreSpawnPlayer()
+        QBCore.Functions.GetPlayerData(function(pd)
+            ped = PlayerPedId()
+            SetEntityCoords(ped, pd.position.x, pd.position.y, pd.position.z)
+            SetEntityHeading(ped, pd.position.a)
+            FreezeEntityPosition(ped, false)
+        end)
+        TriggerServerEvent('QBCore:Server:OnPlayerLoaded')
+        TriggerEvent('QBCore:Client:OnPlayerLoaded')
+        if insideMeta.property_id ~= nil then
+            local property_id = insideMeta.property_id
+            TriggerServerEvent('ps-housing:server:enterProperty', tostring(property_id))
+        end
+        PostSpawnPlayer()
+    elseif type == "house" then
+        PreSpawnPlayer()
+        TriggerServerEvent('QBCore:Server:OnPlayerLoaded')
+        TriggerEvent('QBCore:Client:OnPlayerLoaded')
+        local property_id = data.spawnloc.property_id
+        TriggerServerEvent('ps-housing:server:enterProperty', tostring(property_id))
+        PostSpawnPlayer()
+    elseif type == "normal" then
+        local pos = QB.Spawns[location].coords
+        PreSpawnPlayer()
+        SetEntityCoords(ped, pos.x, pos.y, pos.z)
+        TriggerServerEvent('QBCore:Server:OnPlayerLoaded')
+        TriggerEvent('QBCore:Client:OnPlayerLoaded')
+        TriggerServerEvent('ps-housing:server:resetMetaData')
+        SetEntityCoords(ped, pos.x, pos.y, pos.z)
+        SetEntityHeading(ped, pos.w)
+        PostSpawnPlayer()
+    end
+    cb('ok')
 end)
+--till here
 
 -- Threads
 
